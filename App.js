@@ -1,19 +1,16 @@
-import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, FlatList } from "react-native";
-// import { initializeApp } from "firebase/app";
-// import { getAnalytics } from "firebase/analytics";
+import React from "react";
+import { StyleSheet, Text, View, FlatList, Button } from "react-native";
+import firebase from "firebase";
+import firestore from "firebase";
 
-const firebase = require("firebase");
-require("firebase/firestore");
-
-export default class App extends React.Component() {
+class App extends React.Component {
   constructor() {
     super();
     this.state = {
       lists: [],
+      uid: 0,
+      loggedInText: "Please wait, you are getting logged in",
     };
-    // const app = initializeApp(firebaseConfig);
-    // const analytics = getAnalytics(app);
 
     const firebaseConfig = {
       apiKey: "AIzaSyDUqWmEYEkLRArxAeM4FFV7NxTovESMapY",
@@ -27,22 +24,36 @@ export default class App extends React.Component() {
 
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
-
-      firebase.firestore().collection("shoppinglists/list2");
     }
+    this.referenceShoppinglistUser = null;
   }
 
   componentDidMount() {
     this.referenceShoppingLists = firebase
       .firestore()
       .collection("shoppinglists");
-    this.unsubscribe = this.referenceShoppingLists.onSnapshot(
-      this.onCollectionUpdate
-    );
-  }
 
+    this.authUnsubscribe = firebase.auth().onAuthStateChanged(async (user) => {
+      if (!user) {
+        await firebase.auth().signInAnonymously();
+      }
+      this.setState({
+        uid: user.uid,
+        loggedInText: "Hello User",
+      });
+
+      this.referenceShoppinglistUser = firebase
+        .firestore()
+        .collection("shoppinglists")
+        .where("uid", "==", this.state.uid);
+      this.unsubscribeListUser = this.referenceShoppinglistUser.onSnapshot(
+        this.onCollectionUpdate
+      );
+    });
+  }
   componentWillUnmount() {
-    this.unsubscribe();
+    this.authUnsubscribe();
+    this.unsubscribeListUser();
   }
 
   onCollectionUpdate = (querySnapshot) => {
@@ -63,21 +74,30 @@ export default class App extends React.Component() {
 
   addList() {
     this.referenceShoppingLists.add({
-      name: "TestList",
-      items: ["eggs", "pasta", "veggies"],
+      name: "Test 2",
+      items: ["pizza", "burgers", "beer"],
+      uid: this.state.uid,
     });
   }
 
   render() {
     return (
       <View style={styles.container}>
+        <Text>{this.state.loggedInText}</Text>
+        <Text style={styles.text}>All Shopping lists</Text>
         <FlatList
           data={this.state.lists}
           renderItem={({ item }) => (
-            <Text>
+            <Text style={styles.item}>
               {item.name}: {item.items}
             </Text>
           )}
+        />
+        <Button
+          onPress={() => {
+            this.addList();
+          }}
+          title="Add something"
         />
       </View>
     );
@@ -97,3 +117,5 @@ const styles = StyleSheet.create({
     fontSize: 30,
   },
 });
+
+export default App;
